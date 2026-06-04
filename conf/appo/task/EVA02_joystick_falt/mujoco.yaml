@@ -1,13 +1,9 @@
 # @package _global_
 training:
   task_name: EVA02JoystickFlat
-  sim_backend: motrix
+  sim_backend: mujoco
 algo:
-  num_envs: 512
-  steps_per_env: 24
-  max_iterations: 180
-env:
-  sim_dt: 0.015
+  max_iterations: 150
 reward:
   scales:
     tracking_lin_vel: 1.0
