@@ -274,7 +274,7 @@ def play_mlx_ppo(cfg: DictConfig, dtype, use_fp16: bool, resolved_sim_backend: s
                 onnx_path,
                 input_names=["obs"],
                 output_names=["action"],
-                opset_version=17,
+                opset_version=18,
             )
         print(f"Exported actor ONNX to {onnx_path}")
 

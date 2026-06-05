@@ -268,7 +268,7 @@ def play_appo(
                 onnx_path,
                 input_names=["obs"],
                 output_names=["action"],
-                opset_version=17,
+                opset_version=18,
             )
         print(f"Exported actor ONNX to {onnx_path}")
 

@@ -28,4 +28,9 @@ _unilab_uv_complete() {
     compadd -- "${candidates[@]}"
 }
 
+if ! type compdef >/dev/null 2>&1; then
+    autoload -Uz compinit
+    compinit
+fi
+
 compdef _unilab_uv_complete uv

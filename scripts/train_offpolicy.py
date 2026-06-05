@@ -483,7 +483,7 @@ def play_offpolicy(algo_name: str, cfg: DictConfig) -> str | None:
                 onnx_path,
                 input_names=input_names,
                 output_names=output_names,
-                opset_version=17,
+                opset_version=18,
             )
         print(f"Exported actor ONNX to {onnx_path}")
 
