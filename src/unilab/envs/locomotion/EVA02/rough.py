@@ -57,12 +57,12 @@ from unilab.terrains import (
 
 # pyright: reportIncompatibleVariableOverride=false, reportAttributeAccessIssue=false, reportCallIssue=false
 
-GO2_HIP_INDICES = np.asarray([0, 3, 6, 9], dtype=np.int32)
-GO2_ACTUATOR_TO_DOF_INDICES = np.asarray([3, 4, 5, 0, 1, 2, 9, 10, 11, 6, 7, 8], dtype=np.int32)
-GO2_FRONT_LEFT = 0
-GO2_FRONT_RIGHT = 1
-GO2_REAR_LEFT = 2
-GO2_REAR_RIGHT = 3
+EVA02_HIP_INDICES = np.asarray([0, 3, 6, 9], dtype=np.int32)
+EVA02_ACTUATOR_TO_DOF_INDICES = np.asarray([3, 4, 5, 0, 1, 2, 9, 10, 11, 6, 7, 8], dtype=np.int32)
+EVA02_FRONT_LEFT = 0
+EVA02_FRONT_RIGHT = 1
+EVA02_REAR_LEFT = 2
+EVA02_REAR_RIGHT = 3
 
 
 @dataclass
@@ -104,8 +104,6 @@ class RoughJoystickSensor(JoystickSensor):
     feet_vel = ["FL_vel", "FR_vel", "RL_vel", "RR_vel"]
     undesired_contact = [
         "base1_contact",
-        "base2_contact",
-        "base3_contact",
         "FL_hip_contact",
         "FR_hip_contact",
         "RL_hip_contact",
@@ -114,14 +112,10 @@ class RoughJoystickSensor(JoystickSensor):
         "FR_thigh_contact",
         "RL_thigh_contact",
         "RR_thigh_contact",
-        "FL_calf_contact1",
-        "FR_calf_contact1",
-        "RL_calf_contact1",
-        "RR_calf_contact1",
-        "FL_calf_contact2",
-        "FR_calf_contact2",
-        "RL_calf_contact2",
-        "RR_calf_contact2",
+        "FL_calf_contact",
+        "FR_calf_contact",
+        "RL_calf_contact",
+        "RR_calf_contact",
     ]
 
 
@@ -132,7 +126,7 @@ class RoughTerminationConfig:
 
 
 @dataclass(kw_only=True)
-class Go2RoughTerrainCfg(TerrainGeneratorCfg):
+class EVA02RoughTerrainCfg(TerrainGeneratorCfg):
     size: tuple[float, float] = (8.0, 8.0)
     num_rows: int = 6
     num_cols: int = 6
@@ -185,17 +179,17 @@ class Go2RoughTerrainCfg(TerrainGeneratorCfg):
     )
 
 
-@registry.envcfg("Go2JoystickRough")
+@registry.envcfg("EVA02JoystickRough")
 @dataclass
-class Go2JoystickRoughCfg(Go2JoystickCfg):
+class EVA02JoystickRoughCfg(Go2JoystickCfg):
     scene: SceneCfg = field(
         default_factory=lambda: SceneCfg(
-            model_file=str(ASSETS_ROOT_PATH / "robots" / "go2" / "go2.xml"),
+            model_file=str(ASSETS_ROOT_PATH / "robots" / "EVA02" / "EVA02_mujoco.xml"),
             fragment_files=[
-                str(ASSETS_ROOT_PATH / "robots" / "go2" / "locomotion_task.xml"),
+                str(ASSETS_ROOT_PATH / "robots" / "EVA02" / "locomotion_task.xml"),
             ],
             terrain=TerrainSceneCfg(
-                generator=Go2RoughTerrainCfg(),
+                generator=EVA02RoughTerrainCfg(),
                 hfield_name="terrain_hfield",
                 geom_name="floor",
             ),
@@ -209,7 +203,7 @@ class Go2JoystickRoughCfg(Go2JoystickCfg):
     reward_config: RoughRewardConfig | None = None
 
 
-class Go2JoystickRoughDomainRandomizationProvider(Go2JoystickDomainRandomizationProvider):
+class EVA02JoystickRoughDomainRandomizationProvider(Go2JoystickDomainRandomizationProvider):
     def _sample_commands(self, env: Any, num_reset: int) -> np.ndarray:
         commands = super()._sample_commands(env, num_reset)
         zero_small_xy_commands(commands, threshold=0.001)
@@ -251,18 +245,18 @@ class Go2JoystickRoughDomainRandomizationProvider(Go2JoystickDomainRandomization
         )
 
 
-@registry.env("Go2JoystickRough", sim_backend="mujoco")
-class Go2JoystickRoughEnv(Go2WalkTask):
-    _cfg: Go2JoystickRoughCfg
+@registry.env("EVA02JoystickRough", sim_backend="mujoco")
+class EVA02JoystickRoughEnv(Go2WalkTask):
+    _cfg: EVA02JoystickRoughCfg
     _reward_cfg: RoughRewardConfig
 
-    def __init__(self, cfg: Go2JoystickRoughCfg, num_envs=1, backend_type="mujoco"):
+    def __init__(self, cfg: EVA02JoystickRoughCfg, num_envs=1, backend_type="mujoco"):
         self._height_scan_dim = len(cfg.terrain_scan.measured_points_x) * len(
             cfg.terrain_scan.measured_points_y
         )
         super().__init__(cfg, num_envs=num_envs, backend_type=backend_type)
         self._dr_manager = DomainRandomizationManager(
-            self, Go2JoystickRoughDomainRandomizationProvider()
+            self, EVA02JoystickRoughDomainRandomizationProvider()
         )
         self._last_dof_vel_for_acc = np.zeros(
             (num_envs, self._num_action), dtype=get_global_dtype()
@@ -272,8 +266,8 @@ class Go2JoystickRoughEnv(Go2WalkTask):
             float(cfg.control_config.non_hip_action_scale),
             dtype=get_global_dtype(),
         )
-        self._action_scale[GO2_HIP_INDICES] = float(cfg.control_config.hip_action_scale)
-        self._default_angles_actuator = self.default_angles[GO2_ACTUATOR_TO_DOF_INDICES]
+        self._action_scale[EVA02_HIP_INDICES] = float(cfg.control_config.hip_action_scale)
+        self._default_angles_actuator = self.default_angles[EVA02_ACTUATOR_TO_DOF_INDICES]
         joint_range = self._backend.get_joint_range()
         self._joint_range = (
             np.asarray(joint_range, dtype=get_global_dtype()) if joint_range is not None else None
@@ -527,7 +521,7 @@ class Go2JoystickRoughEnv(Go2WalkTask):
             actions = np.asarray(info.get("last_actions", actions), dtype=get_global_dtype())
         targets_actuator = actions * self._action_scale + self._default_angles_actuator
         targets_dof = np.empty_like(targets_actuator)
-        targets_dof[:, GO2_ACTUATOR_TO_DOF_INDICES] = targets_actuator
+        targets_dof[:, EVA02_ACTUATOR_TO_DOF_INDICES] = targets_actuator
         torques = (
             float(self._cfg.control_config.Kp) * (targets_dof - dof_pos)
             - float(self._cfg.control_config.Kd) * dof_vel
@@ -600,7 +594,7 @@ class Go2JoystickRoughEnv(Go2WalkTask):
     # ── reward functions that need backend / env state (kept as methods) ────
 
     def _reward_hip_pos(self, ctx: RewardContext) -> np.ndarray:
-        diff = ctx.dof_pos[:, GO2_HIP_INDICES] - self.default_angles[GO2_HIP_INDICES]
+        diff = ctx.dof_pos[:, EVA02_HIP_INDICES] - self.default_angles[EVA02_HIP_INDICES]
         return np.asarray(
             np.sum(np.square(diff), axis=1) * self._upright_scale(ctx.gravity),
             dtype=get_global_dtype(),
@@ -710,22 +704,22 @@ class Go2JoystickRoughEnv(Go2WalkTask):
         air = self._current_air_time
         contact = self._current_contact_time
         sync_fl_rr = _gait_sync_reward(
-            air, contact, GO2_FRONT_LEFT, GO2_REAR_RIGHT, cfg.feet_gait_std, cfg.feet_gait_max_err
+            air, contact, EVA02_FRONT_LEFT, EVA02_REAR_RIGHT, cfg.feet_gait_std, cfg.feet_gait_max_err
         )
         sync_fr_rl = _gait_sync_reward(
-            air, contact, GO2_FRONT_RIGHT, GO2_REAR_LEFT, cfg.feet_gait_std, cfg.feet_gait_max_err
+            air, contact, EVA02_FRONT_RIGHT, EVA02_REAR_LEFT, cfg.feet_gait_std, cfg.feet_gait_max_err
         )
         async_fl_fr = _gait_async_reward(
-            air, contact, GO2_FRONT_LEFT, GO2_FRONT_RIGHT, cfg.feet_gait_std, cfg.feet_gait_max_err
+            air, contact, EVA02_FRONT_LEFT, EVA02_FRONT_RIGHT, cfg.feet_gait_std, cfg.feet_gait_max_err
         )
         async_rr_rl = _gait_async_reward(
-            air, contact, GO2_REAR_RIGHT, GO2_REAR_LEFT, cfg.feet_gait_std, cfg.feet_gait_max_err
+            air, contact, EVA02_REAR_RIGHT, EVA02_REAR_LEFT, cfg.feet_gait_std, cfg.feet_gait_max_err
         )
         async_fl_rl = _gait_async_reward(
-            air, contact, GO2_FRONT_LEFT, GO2_REAR_LEFT, cfg.feet_gait_std, cfg.feet_gait_max_err
+            air, contact, EVA02_FRONT_LEFT, EVA02_REAR_LEFT, cfg.feet_gait_std, cfg.feet_gait_max_err
         )
         async_fr_rr = _gait_async_reward(
-            air, contact, GO2_FRONT_RIGHT, GO2_REAR_RIGHT, cfg.feet_gait_std, cfg.feet_gait_max_err
+            air, contact, EVA02_FRONT_RIGHT, EVA02_REAR_RIGHT, cfg.feet_gait_std, cfg.feet_gait_max_err
         )
         reward = sync_fl_rr * sync_fr_rl * async_fl_fr * async_rr_rl * async_fl_rl * async_fr_rr
         return np.asarray(
@@ -768,22 +762,18 @@ def _gait_async_reward(
     return np.exp(-(se_act_0 + se_act_1) / std)
 
 
-# Backwards-compat aliases for any callers that imported the unused defaults.
 __all__ = [
     "DEFAULT_SCAN_POINTS_X",
     "DEFAULT_SCAN_POINTS_Y",
-    "GO2_ACTUATOR_TO_DOF_INDICES",
-    "GO2_HIP_INDICES",
-    "Go2JoystickRoughCfg",
-    "Go2JoystickRoughDomainRandomizationProvider",
-    "Go2JoystickRoughEnv",
-    "Go2RoughTerrainCfg",
+    "EVA02_ACTUATOR_TO_DOF_INDICES",
+    "EVA02_HIP_INDICES",
+    "EVA02JoystickRoughCfg",
+    "EVA02JoystickRoughDomainRandomizationProvider",
+    "EVA02JoystickRoughEnv",
+    "EVA02RoughTerrainCfg",
     "RoughCommands",
     "RoughControlConfig",
     "RoughJoystickSensor",
     "RoughRewardConfig",
     "RoughTerminationConfig",
 ]
-
-
-registry.register_env("Go2JoystickRough", Go2JoystickRoughEnv, sim_backend="motrix")

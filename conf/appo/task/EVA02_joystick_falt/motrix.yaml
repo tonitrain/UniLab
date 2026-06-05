@@ -1,6 +1,6 @@
 # @package _global_
 training:
-  task_name: Go2JoystickFlat
+  task_name: EVA02JoystickFlat
   sim_backend: motrix
 algo:
   num_envs: 512
