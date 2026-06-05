@@ -2361,6 +2361,7 @@ def test_offpolicy_rejects_algo_task_owner_mismatch(algo: str, task: str):
 
 def test_train_rsl_rl_get_log_root_uses_algo_log_name(monkeypatch: pytest.MonkeyPatch):
     """Verify _get_log_root uses algo.algo_log_name (issue #168)."""
+    monkeypatch.delenv("UNILAB_TEST_LOG_ROOT", raising=False)
     mod = _train_rsl_rl(monkeypatch)
     cfg = _ppo_cfg()
 
@@ -2374,6 +2375,7 @@ def test_train_rsl_rl_get_log_root_uses_algo_log_name(monkeypatch: pytest.Monkey
 def test_train_rsl_rl_play_missing_checkpoint_skips_env_creation_and_prints_context(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ):
+    monkeypatch.delenv("UNILAB_TEST_LOG_ROOT", raising=False)
     mod = _train_rsl_rl(monkeypatch)
     cfg = _ppo_cfg(["task=go1_joystick_flat/mujoco", "training.play_only=true"])
     cfg.algo.algo_log_name = "custom_ppo"
@@ -2406,6 +2408,7 @@ def test_train_rsl_rl_play_missing_checkpoint_skips_env_creation_and_prints_cont
 def test_train_rsl_rl_play_reports_missing_requested_checkpoint_in_resolved_run(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ):
+    monkeypatch.delenv("UNILAB_TEST_LOG_ROOT", raising=False)
     mod = _train_rsl_rl(monkeypatch)
     cfg = _ppo_cfg(["task=go1_joystick_flat/mujoco", "training.play_only=true"])
     cfg.algo.algo_log_name = "custom_ppo"
@@ -2618,8 +2621,9 @@ def test_train_rsl_rl_record_play_uses_backend_plan(
     assert captured["output_video"] == run_dir / "play_video.mp4"
 
 
-def test_train_appo_get_log_root_uses_algo_log_name():
+def test_train_appo_get_log_root_uses_algo_log_name(monkeypatch: pytest.MonkeyPatch):
     """Verify APPO _get_log_root uses algo.algo_log_name (issue #168)."""
+    monkeypatch.delenv("UNILAB_TEST_LOG_ROOT", raising=False)
     mod = _train_appo()
     cfg = _appo_cfg()
 
@@ -2629,8 +2633,11 @@ def test_train_appo_get_log_root_uses_algo_log_name():
     assert "logs/test_appo" in log_root
 
 
-def test_play_resolve_checkpoint_uses_algo_log_name(tmp_path):
+def test_play_resolve_checkpoint_uses_algo_log_name(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
     """Verify play_interactive.resolve_checkpoint uses algo_log_name (issue #168)."""
+    monkeypatch.delenv("UNILAB_TEST_LOG_ROOT", raising=False)
     mod = _play_interactive()
 
     # Create test directory structure with custom algo_log_name
@@ -2663,34 +2670,68 @@ def test_play_interactive_respects_training_device_override():
     assert mod._select_playback_device(cfg) == "cpu"
 
 
-def test_play_interactive_extracts_optional_algo_flag():
+def test_play_interactive_parses_explicit_cli():
     mod = _play_interactive()
 
-    algo, cleaned = mod._extract_interactive_algo(
-        ["play_interactive.py", "--algo", "hora_distill", "task=sharpa_inhand/mujoco_nodr"]
+    parsed = mod._parse_interactive_cli(
+        ["--algo", "hora_distill", "--task", "sharpa_inhand", "--sim", "mujoco_nodr"]
     )
 
-    assert algo == "hora_distill"
-    assert cleaned == ["play_interactive.py", "task=sharpa_inhand/mujoco_nodr"]
+    assert parsed.algo == "hora_distill"
+    assert parsed.task == "sharpa_inhand"
+    assert parsed.sim == "mujoco_nodr"
+    assert parsed.overrides == ["task=sharpa_inhand/mujoco_nodr"]
 
 
 @pytest.mark.parametrize("algo", ["appo", "sac", "hora_distill"])
-def test_play_interactive_extracts_feature_algo_flags(algo: str):
+def test_play_interactive_parses_feature_algo_flags(algo: str):
     mod = _play_interactive()
 
-    parsed_algo, cleaned = mod._extract_interactive_algo(
-        ["play_interactive.py", f"--algo={algo}", "task=sharpa_inhand/mujoco_hora"]
+    parsed = mod._parse_interactive_cli(
+        [f"--algo={algo}", "--task", "sharpa_inhand", "--sim", "mujoco_hora"]
     )
 
-    assert parsed_algo == algo
-    assert cleaned == ["play_interactive.py", "task=sharpa_inhand/mujoco_hora"]
+    assert parsed.algo == algo
+    assert parsed.overrides == ["task=sharpa_inhand/mujoco_hora"]
+
+
+def test_play_interactive_cli_respects_owner_action_mode_and_user_override():
+    mod = _play_interactive()
+
+    default_parsed = mod._parse_interactive_cli(
+        ["--algo", "ppo", "--task", "go2_joystick_rough", "--sim", "mujoco"]
+    )
+    default_cfg = mod._compose_interactive_config(default_parsed.algo, default_parsed.overrides)
+
+    assert default_cfg.interactive.action_mode == "policy"
+
+    parsed = mod._parse_interactive_cli(
+        [
+            "--algo",
+            "ppo",
+            "--task",
+            "go2_joystick_rough",
+            "--sim",
+            "mujoco",
+            "interactive.action_mode=random",
+        ]
+    )
+    cfg = mod._compose_interactive_config(parsed.algo, parsed.overrides)
+
+    assert parsed.overrides == [
+        "task=go2_joystick_rough/mujoco",
+        "interactive.action_mode=random",
+    ]
+    assert cfg.interactive.action_mode == "random"
 
 
 def test_play_interactive_rejects_unknown_algo_flag():
     mod = _play_interactive()
 
-    with pytest.raises(SystemExit, match="Unsupported --algo"):
-        mod._extract_interactive_algo(["play_interactive.py", "--algo=unknown"])
+    with pytest.raises(SystemExit):
+        mod._parse_interactive_cli(
+            ["--algo=unknown", "--task", "go1_joystick_flat", "--sim", "mujoco"]
+        )
 
 
 def test_play_interactive_dynamic_compose_supports_algo_roots():
